@@ -14,14 +14,7 @@ from google.cloud import secretmanager
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
 
-def get_secret(secret_id, version_id='latest'):
-    client = secretmanager.SecretManagerServiceClient()
-    name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
-    response = client.access_secret_version(name=name)
-    secret = response.payload.data.decode('UTF-8')
-    return secret
-
-# Charger la clé JSON depuis Secret Manager via la variable d'environnement
+# Charger la clé JSON depuis la variable d'environnement
 key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
 if key_json is None:
     print("Environment variable SERVICE_ACCOUNT_KEY_JSON is not set.")
@@ -141,7 +134,7 @@ class HelpDesk():
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
             elif len (distinct_sources) > 1:
-                return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
+                return f"Voici {len (distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
 
         return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
 
