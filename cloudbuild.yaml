@@ -1,12 +1,4 @@
 steps:
-  # Étape 0 : Copier la clé JSON dans le contexte de build
-  - name: 'ubuntu'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        cp /workspace/pa-ingestion-8d68ccddaee5.json .
-
   # Étape 1 : Construire l'image Docker
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/helpdesk-app', '.']

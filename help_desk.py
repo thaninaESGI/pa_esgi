@@ -7,6 +7,27 @@ from langchain.prompts import PromptTemplate
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
+from google.cloud import secretmanager
+import json
+
+# Fonction pour récupérer le secret depuis Secret Manager
+def get_secret(secret_id, version_id='latest'):
+    client = secretmanager.SecretManagerServiceClient()
+    name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
+    response = client.access_secret_version(name=name)
+    secret = response.payload.data.decode('UTF-8')
+    return secret
+
+# Charger la clé JSON depuis Secret Manager
+key_json = get_secret('my-service-account-key')
+key_data = json.loads(key_json)
+
+# Sauvegarder temporairement la clé pour l'utiliser
+with open('/app/service-account-key.json', 'w') as key_file:
+    json.dump(key_data, key_file)
+
+# Mettre à jour la variable d'environnement
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/app/service-account-key.json'
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
@@ -114,4 +135,4 @@ if __name__ == "__main__":
     prompt = 'Comment est-ce que la formation permet l’obtention de la Certification Professionnelle ?'
     result, sources = model.retrieval_qa_inference(prompt, verbose=False)
     print(result)
-    print("youpiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii!!! !!!!")
+    print("youpiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii") 
