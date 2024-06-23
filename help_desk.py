@@ -1,10 +1,10 @@
 import sys
 import load_db
 import collections
-from langchain_openai import OpenAI
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
 import json
@@ -20,9 +20,11 @@ def get_secret(secret_id, version_id='latest'):
     secret = response.payload.data.decode('UTF-8')
     return secret
 
-# Charger la clé JSON depuis Secret Manager
-key_json = get_secret('my-service-account-key')
-print("Key JSON from Secret Manager:", key_json)  # Ajouter cette ligne pour déboguer
+# Charger la clé JSON depuis Secret Manager via la variable d'environnement
+key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
+if key_json is None:
+    print("Environment variable SERVICE_ACCOUNT_KEY_JSON is not set.")
+    sys.exit(1)
 
 try:
     key_data = json.loads(key_json)
@@ -133,7 +135,7 @@ class HelpDesk():
             if len(distinct_sources) == 1:
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-            elif len(distinct_sources) > 1:
+            elif len distinct_sources) > 1:
                 return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
 
         return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
