@@ -129,11 +129,11 @@ class HelpDesk():
             distinct_sources = list(zip(*collections.Counter(sources).most_common()))[0][:k]
             distinct_sources_str = "  \n- ".join(distinct_sources)
 
-            if len(distinct sources) == 1:
+            if len(distinct_sources) == 1:
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-            elif len (distinct sources) > 1:
-                return f"Voici {len distinct sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
+            elif len (distinct_sources) > 1:
+                return f"Voici {len (distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
 
         return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
 
