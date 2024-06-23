@@ -16,5 +16,11 @@ steps:
         gcloud beta run jobs update helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region us-central1 || \
         gcloud beta run jobs create helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region us-central1
 
+timeout: "1200s"  # Exemple de timeout, ajustez selon vos besoins
+
+options:
+  defaultLogsBucketBehavior: "REGIONAL_USER_OWNED_BUCKET"
+
 images:
   - 'gcr.io/$PROJECT_ID/helpdesk-app'
+
