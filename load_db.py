@@ -1,126 +1,156 @@
 import sys
-import logging
-import shutil
-from pathlib import Path
-from google.cloud import storage
-from langchain.vectorstores import Chroma
-from langchain.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
+import load_db
+import collections
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_community.embeddings import OpenAIEmbeddings
+from dotenv import load_dotenv
+import os
+import json
+from google.cloud import secretmanager
 
-class DataLoader():
-    """Create, load, save the DB using the PDF Loader"""
-    def __init__(
-        self,
-        directories=['bac1_2', 'bac3_5', 'ingestion_bucket_1'],
-        persist_directory='./db/chroma/',
-        bucket_name='ingestion_bucket_1',
-        credentials_path='/app/service-account-key.json'  # Modifié pour utiliser le chemin correct
-    ):
-        self.directories = directories
-        self.persist_directory = persist_directory
-        self.bucket_name = bucket_name
-        self.credentials_path = credentials_path
+# Charger les variables d'environnement depuis le fichier .env
+load_dotenv()
 
-    def download_pdfs_from_bucket(self):
-        """Download PDF files from Google Cloud Storage bucket"""
-        client = storage.Client.from_service_account_json(self.credentials_path)
-        bucket = client.bucket(self.bucket_name)
-        blobs = bucket.list_blobs()
+def get_secret(secret_id, version_id='latest'):
+    client = secretmanager.SecretManagerServiceClient()
+    name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
+    response = client.access_secret_version(name=name)
+    secret = response.payload.data.decode('UTF-8')
+    return secret
 
-        local_paths = []
-        for blob in blobs:
-            if blob.name.endswith('.pdf'):
-                local_path = f'/tmp/{blob.name}'
-                blob.download_to_filename(local_path)
-                local_paths.append(local_path)
-        return local_paths
+# Charger la clé JSON depuis Secret Manager via la variable d'environnement
+key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
+if key_json is None:
+    print("Environment variable SERVICE_ACCOUNT_KEY_JSON is not set.")
+    sys.exit(1)
 
-    def load_from_pdf_loader(self):
-        """Load PDF files from specified directories"""
-        docs = []
-        pdf_files = self.download_pdfs_from_bucket()
-        for pdf_file in pdf_files:
-            loader = PyPDFLoader(pdf_file)
-            loaded_docs = loader.load()
-            for doc in loaded_docs:
-                doc.metadata['source'] = str(pdf_file)  # Ajoute le nom de fichier aux métadonnées
-            docs.extend(loaded_docs)
-        return docs
+try:
+    key_data = json.loads(key_json)
+    print("Key data successfully loaded.")
+except json.JSONDecodeError as e:
+    print("Failed to load key data:", e)
+    sys.exit(1)
 
-    def split_docs(self, docs):
-        # Markdown splitting settings
-        headers_to_split_on = [
-            ("#", "Titre 1"),
-            ("##", "Sous-titre 1"),
-            ("###", "Sous-titre 2"),
+# Définir le chemin du fichier de clé JSON
+credentials_path = '/app/service-account-key.json'
+
+# Sauvegarder temporairement la clé pour l'utiliser
+try:
+    with open(credentials_path, 'w') as key_file:
+        json.dump(key_data, key_file)
+    print("Key file written successfully.")
+except IOError as e:
+    print("Failed to write key file:", e)
+    sys.exit(1)
+
+# Mettre à jour la variable d'environnement
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+print("Environment variable set successfully.")
+
+class HelpDesk():
+    """QA chain"""
+    def __init__(self, new_db=True, threshold=0.3):
+        self.new_db = new_db
+        self.template = self.get_template()
+        self.embeddings = self.get_embeddings()
+        self.llm = self.get_llm()
+        self.prompt = self.get_prompt()
+        self.threshold = threshold
+
+        # Passer le chemin des credentials à DataLoader
+        if self.new_db:
+            self.db = load_db.DataLoader(credentials_path=credentials_path).set_db(self.embeddings)
+        else:
+            self.db = load_db.DataLoader(credentials_path=credentials_path).get_db(self.embeddings)
+
+        self.retriever = self.db.as_retriever()
+        self.retrieval_qa_chain = self.get_retrieval_qa()
+
+    def get_template(self):
+        template = """
+        Etant donnés ces textes:
+        -----
+        {context}
+        -----
+        Répond à la question suivante:
+        Question: {question}
+        Réponse utile:
+        """
+        return template
+
+    def get_prompt(self) -> PromptTemplate:
+        prompt = PromptTemplate(
+            template=self.template,
+            input_variables=["context", "question"]
+        )
+        return prompt
+
+    def get_embeddings(self) -> OpenAIEmbeddings:
+        embeddings = OpenAIEmbeddings()
+        return embeddings
+
+    def get_llm(self):
+        llm = OpenAI()
+        return llm
+
+    def get_retrieval_qa(self):
+        chain_type_kwargs = {"prompt": self.prompt}
+        qa = RetrievalQA.from_chain_type(
+            llm=self.llm,
+            chain_type="stuff",
+            retriever=self.retriever,
+            return_source_documents=True,
+            chain_type_kwargs=chain_type_kwargs
+        )
+        return qa
+
+    def retrieval_qa_inference(self, question, verbose=True):
+        query = {"query": question}
+        answer = self.retrieval_qa_chain(query)
+        filtered_answer = self.filter_by_similarity(answer, self.threshold)
+        sources = self.list_top_k_sources(filtered_answer, k=3)
+
+        if verbose:
+            print(sources)
+
+        return filtered_answer["result"], sources
+
+    def filter_by_similarity(self, answer, threshold):
+        filtered_docs = []
+        for doc in answer["source_documents"]:
+            if doc.metadata.get("score", 0) > threshold:
+                filtered_docs.append(doc)
+        answer["source_documents"] = filtered_docs
+        return answer
+
+    def list_top_k_sources(self, answer, k=3):
+        sources = [
+            f'[{res.metadata.get("title", "Sans titre")}]({res.metadata.get("source", "Sans source")})'
+            for res in answer["source_documents"]
         ]
 
-        markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+        if sources:
+            k = min(k, len(sources))
+            distinct_sources = list(zip(*collections.Counter(sources).most_common()))[0][:k]
+            distinct_sources_str = "  \n- ".join(distinct_sources)
 
-        # Split based on markdown and add original metadata
-        md_docs = []
-        for doc in docs:
-            md_doc = markdown_splitter.split_text(doc.page_content)
-            for i in range(len(md_doc)):
-                md_doc[i].metadata = md_doc[i].metadata | doc.metadata
-            md_docs.extend(md_doc)
+            if len(distinct sources) == 1:
+                return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-        # Split into chunks
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=512,
-            chunk_overlap=20,
-            separators=["\n\n", "\n", "(?<=\. )", " ", ""]
-        )
+            elif len distinct sources) > 1:
+                return f"Voici {len distinct sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
 
-        splitted_docs = splitter.split_documents(md_docs)
-
-        # Add context to chunks
-        enriched_docs = []
-        for i, doc in enumerate(splitted_docs):
-            if i > 0:
-                doc.metadata["previous_chunk"] = splitted_docs[i-1].page_content
-            if i < len(splitted_docs) - 1:
-                doc.metadata["next_chunk"] = splitted_docs[i+1].page_content
-            enriched_docs.append(doc)
-
-        return enriched_docs
-
-    def save_to_db(self, splitted_docs, embeddings):
-        """Save chunks to Chroma DB"""
-        db = Chroma.from_documents(splitted_docs, embeddings, persist_directory=self.persist_directory)
-        db.persist()
-        return db
-
-    def load_from_db(self, embeddings):
-        """Load chunks from Chroma DB"""
-        db = Chroma(
-            persist_directory=self.persist_directory,
-            embedding_function=embeddings
-        )
-        return db
-
-    def set_db(self, embeddings):
-        """Create, save, and load db"""
-        try:
-            shutil.rmtree(self.persist_directory)
-        except Exception as e:
-            logging.warning("%s", e)
-
-        # Load docs
-        docs = self.load_from_pdf_loader()
-
-        # Split docs and add context
-        splitted_docs = self.split_docs(docs)
-
-        db = self.save_to_db(splitted_docs, embeddings)
-
-        return db
-
-    def get_db(self, embeddings):
-        """Create, save, and load db"""
-        db = self.load_from_db(embeddings)
-        return db
-
+        return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
 
 if __name__ == "__main__":
-    pass
+    model = HelpDesk(new_db=True, threshold=0.3)
+
+    print(model.db._collection.count())
+
+    prompt = 'Comment est-ce que la formation permet l’obtention de la Certification Professionnelle ?'
+    result, sources = model.retrieval_qa_inference(prompt, verbose=False)
+    print(result)
+    print("youpiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
