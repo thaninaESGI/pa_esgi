@@ -1,0 +1,19 @@
+# Ignorer tous les fichiers JSON
+*.json
+
+# Ignorer les répertoires de l'éditeur de code
+.vscode/
+.idea/
+
+# Ignorer les fichiers de configuration de l'environnement virtuel Python
+.env/
+venv/
+
+# Ignorer les fichiers de log
+*.log
+
+# Ignorer les fichiers compilés Python
+__pycache__/
+*.pyc
+
+
