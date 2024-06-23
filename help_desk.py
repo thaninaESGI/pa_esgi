@@ -34,9 +34,12 @@ except json.JSONDecodeError as e:
     print("Failed to load key data:", e)
     sys.exit(1)
 
+# Définir le chemin du fichier de clé JSON
+credentials_path = '/app/service-account-key.json'
+
 # Sauvegarder temporairement la clé pour l'utiliser
 try:
-    with open('/app/service-account-key.json', 'w') as key_file:
+    with open(credentials_path, 'w') as key_file:
         json.dump(key_data, key_file)
     print("Key file written successfully.")
 except IOError as e:
@@ -44,7 +47,7 @@ except IOError as e:
     sys.exit(1)
 
 # Mettre à jour la variable d'environnement
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/app/service-account-key.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
 print("Environment variable set successfully.")
 
 class HelpDesk():
@@ -57,10 +60,11 @@ class HelpDesk():
         self.prompt = self.get_prompt()
         self.threshold = threshold
 
+        # Passer le chemin des credentials à DataLoader
         if self.new_db:
-            self.db = load_db.DataLoader().set_db(self.embeddings)
+            self.db = load_db.DataLoader(credentials_path=credentials_path).set_db(self.embeddings)
         else:
-            self.db = load_db.DataLoader().get_db(self.embeddings)
+            self.db = load_db.DataLoader(credentials_path=credentials_path).get_db(self.embeddings)
 
         self.retriever = self.db.as_retriever()
         self.retrieval_qa_chain = self.get_retrieval_qa()
@@ -136,7 +140,7 @@ class HelpDesk():
             if len(distinct_sources) == 1:
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-            elif len(distinct_sources) > 1:
+            elif len (distinct_sources) > 1:
                 return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
 
         return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
