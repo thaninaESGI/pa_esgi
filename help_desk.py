@@ -50,13 +50,13 @@ except IOError as e:
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
 print("Environment variable set successfully.")
 
-# Charger la clé API OpenAI depuis les variables d'environnement
-openai_api_key = os.getenv('OPENAI_API_KEY')
+# Récupérer la clé API OpenAI depuis Secret Manager
+openai_api_key = get_secret('openai-api-key')
 if not openai_api_key:
-    print("Environment variable OPENAI_API_KEY is not set or is empty.")
+    print("Failed to load OpenAI API Key from Secret Manager.")
     sys.exit(1)
 else:
-    print("OpenAI API Key successfully loaded.")
+    print("OpenAI API Key successfully loaded from Secret Manager.")
 
 class HelpDesk():
     """QA chain"""
