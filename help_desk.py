@@ -22,14 +22,27 @@ def get_secret(secret_id, version_id='latest'):
 
 # Charger la clé JSON depuis Secret Manager
 key_json = get_secret('my-service-account-key')
-key_data = json.loads(key_json)
+print("Key JSON from Secret Manager:", key_json)  # Ajouter cette ligne pour déboguer
+
+try:
+    key_data = json.loads(key_json)
+    print("Key data successfully loaded.")
+except json.JSONDecodeError as e:
+    print("Failed to load key data:", e)
+    sys.exit(1)
 
 # Sauvegarder temporairement la clé pour l'utiliser
-with open('/app/service-account-key.json', 'w') as key_file:
-    json.dump(key_data, key_file)
+try:
+    with open('/app/service-account-key.json', 'w') as key_file:
+        json.dump(key_data, key_file)
+    print("Key file written successfully.")
+except IOError as e:
+    print("Failed to write key file:", e)
+    sys.exit(1)
 
 # Mettre à jour la variable d'environnement
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/app/service-account-key.json'
+print("Environment variable set successfully.")
 
 class HelpDesk():
     """QA chain"""
