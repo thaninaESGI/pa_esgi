@@ -4,6 +4,7 @@ import collections
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
