@@ -13,8 +13,8 @@ steps:
     args:
       - '-c'
       - |
-        gcloud beta run jobs update helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west1 || \
-        gcloud beta run jobs create helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west1
+        gcloud beta run jobs update helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west9 || \
+        gcloud beta run jobs create helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west9
 
 timeout: "1200s"  # Exemple de timeout, ajustez selon vos besoins
 
