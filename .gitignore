@@ -1,6 +1,6 @@
 # Ignorer tous les fichiers JSON
 *.json
-
+!pa-ingestion-8d68ccddaee5.json 
 # Ignorer les répertoires de l'éditeur de code
 .vscode/
 .idea/
