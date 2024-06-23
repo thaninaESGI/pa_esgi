@@ -8,13 +8,21 @@ from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
 import json
+from google.cloud import secretmanager
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
 
-# Charger la clé JSON depuis le fichier temporaire
-with open('/workspace/service-account-key.json', 'r') as key_file:
-    key_data = json.load(key_file)
+def get_secret(secret_id, version_id='latest'):
+    client = secretmanager.SecretManagerServiceClient()
+    name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
+    response = client.access_secret_version(name=name)
+    secret = response.payload.data.decode('UTF-8')
+    return secret
+
+# Charger la clé JSON depuis Secret Manager
+key_json = get_secret('my-service-account-key')
+key_data = json.loads(key_json)
 
 # Sauvegarder temporairement la clé pour l'utiliser
 with open('/app/service-account-key.json', 'w') as key_file:
