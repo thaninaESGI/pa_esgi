@@ -1,11 +1,11 @@
 steps:
-  # Étape 0 : Copier la clé JSON depuis Secret Manager
+  # Étape 0 : Copier la clé JSON depuis la variable d'environnement
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo $GCP_SERVICE_ACCOUNT_KEY | base64 --decode > /workspace/service-account-key.json
+        echo "$_GCP_SERVICE_ACCOUNT_KEY" | base64 --decode > /workspace/service-account-key.json
 
   # Étape 1 : Construire l'image Docker
   - name: 'gcr.io/cloud-builders/docker'
