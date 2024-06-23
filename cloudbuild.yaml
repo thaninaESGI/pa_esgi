@@ -1,0 +1,20 @@
+steps:
+  # Étape 1 : Construire l'image Docker
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/helpdesk-app', '.']
+
+  # Étape 2 : Pousser l'image Docker vers Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/helpdesk-app']
+
+  # Étape 3 : Déployer le job Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud beta run jobs update helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region us-central1 || \
+        gcloud beta run jobs create helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region us-central1
+
+images:
+  - 'gcr.io/$PROJECT_ID/helpdesk-app'
