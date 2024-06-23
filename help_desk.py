@@ -63,7 +63,7 @@ class HelpDesk():
     def __init__(self, new_db=True, threshold=0.3):
         self.new_db = new_db
         self.template = self.get_template()
-        self.embeddings = self.get_embeddings()
+        self.embeddings = self.get_embeddings(api_key=openai_api_key)
         self.llm = self.get_llm(api_key=openai_api_key)
         self.prompt = self.get_prompt()
         self.threshold = threshold
@@ -96,8 +96,8 @@ class HelpDesk():
         )
         return prompt
 
-    def get_embeddings(self) -> OpenAIEmbeddings:
-        embeddings = OpenAIEmbeddings()
+    def get_embeddings(self, api_key) -> OpenAIEmbeddings:
+        embeddings = OpenAIEmbeddings(api_key=api_key)
         return embeddings
 
     def get_llm(self, api_key):
