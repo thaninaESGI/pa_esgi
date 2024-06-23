@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiez les fichiers du projet dans le répertoire de travail
 COPY . .
 
+# Définir les variables d'environnement pour le projet et les credentials
+ENV GOOGLE_APPLICATION_CREDENTIALS=/app/service-account-key.json
+ENV GCP_PROJECT=pa-ingestion
+
 # Exécutez le script principal
 CMD ["python", "help_desk.py"]
 

@@ -7,13 +7,18 @@ from langchain.prompts import PromptTemplate
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
-from google.cloud import secretmanager
 import json
+from google.cloud import secretmanager
 
-# Fonction pour récupérer le secret depuis Secret Manager
+# Charger les variables d'environnement depuis le fichier .env
+load_dotenv()
+
 def get_secret(secret_id, version_id='latest'):
     client = secretmanager.SecretManagerServiceClient()
-    name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
+    project_id = os.getenv('GCP_PROJECT')
+    if not project_id:
+        raise ValueError("GCP_PROJECT environment variable is not set")
+    name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
     response = client.access_secret_version(name=name)
     secret = response.payload.data.decode('UTF-8')
     return secret
@@ -28,9 +33,6 @@ with open('/app/service-account-key.json', 'w') as key_file:
 
 # Mettre à jour la variable d'environnement
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/app/service-account-key.json'
-
-# Charger les variables d'environnement depuis le fichier .env
-load_dotenv()
 
 class HelpDesk():
     """QA chain"""
@@ -135,4 +137,4 @@ if __name__ == "__main__":
     prompt = 'Comment est-ce que la formation permet l’obtention de la Certification Professionnelle ?'
     result, sources = model.retrieval_qa_inference(prompt, verbose=False)
     print(result)
-    print("youpiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii") 
+    print("youpiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
