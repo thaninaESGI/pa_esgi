@@ -87,40 +87,4 @@ class DataLoader():
 
     def save_to_db(self, splitted_docs, embeddings):
         """Save chunks to Chroma DB"""
-        db = Chroma.from_documents(splitted_docs, embeddings, persist_directory=self.persist_directory)
-        db.persist()
-        return db
-
-    def load_from_db(self, embeddings):
-        """Load chunks from Chroma DB"""
-        db = Chroma(
-            persist_directory=self.persist_directory,
-            embedding_function=embeddings
-        )
-        return db
-
-    def set_db(self, embeddings):
-        """Create, save, and load db"""
-        try:
-            shutil.rmtree(self.persist_directory)
-        except Exception as e:
-            logging.warning("%s", e)
-
-        # Load docs
-        docs = self.load_from_pdf_loader()
-
-        # Split docs and add context
-        splitted_docs = self.split_docs(docs)
-
-        db = self.save_to_db(splitted_docs, embeddings)
-
-        return db
-
-    def get_db(self, embeddings):
-        """Create, save, and load db"""
-        db = self.load_from_db(embeddings)
-        return db
-
-
-if __name__ == "__main__":
-    pass
+        db = Chroma.from
