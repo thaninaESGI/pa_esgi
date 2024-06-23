@@ -1,0 +1,8 @@
+google-cloud-storage
+langchain
+langchain-openai
+python-dotenv
+langchain-community
+pypdf
+chromadb
+flask
