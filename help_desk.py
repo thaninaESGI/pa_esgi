@@ -9,19 +9,11 @@ from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
 import json
-from google.cloud import secretmanager
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
 
-def get_secret(secret_id, version_id='latest'):
-    client = secretmanager.SecretManagerServiceClient()
-    name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
-    response = client.access_secret_version(name=name)
-    secret = response.payload.data.decode('UTF-8')
-    return secret
-
-# Charger la clé JSON depuis Secret Manager via la variable d'environnement
+# Charger la clé JSON depuis la variable d'environnement
 key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
 if key_json is None:
     print("Environment variable SERVICE_ACCOUNT_KEY_JSON is not set.")
