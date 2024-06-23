@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Définir la variable d'environnement pour le fichier des credentials
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/pa-ingestion-98640c36406b.json
-COPY pa-ingestion-98640c36406b.json  /app/pa-ingestion-98640c36406b.json
+ENV GOOGLE_APPLICATION_CREDENTIALS=/app/pa-ingestion-8d68ccddaee5.json
+COPY pa-ingestion-8d68ccddaee5.json  /app/pa-ingestion-8d68ccddaee5.json
 
 # Copiez le fichier .env dans le conteneur
 COPY .env .env
