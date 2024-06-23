@@ -15,7 +15,7 @@ COPY . .
 
 # Définir la variable d'environnement pour le fichier des credentials
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/pa-ingestion-98640c36406b.json
-COPY pa-ingestion-98640c36406b.json /app/pa-ingestion-98640c36406b.json
+COPY pa-ingestion-98640c36406b.json  /app/pa-ingestion-98640c36406b.json
 
 # Copiez le fichier .env dans le conteneur
 COPY .env .env
