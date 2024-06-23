@@ -9,6 +9,7 @@ from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
 import json
+from google.cloud import secretmanager
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
