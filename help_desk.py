@@ -8,24 +8,13 @@ from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
 import json
-from google.cloud import secretmanager
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
 
-def get_secret(secret_id, version_id='latest'):
-    client = secretmanager.SecretManagerServiceClient()
-    project_id = os.getenv('GCP_PROJECT')
-    if not project_id:
-        raise ValueError("GCP_PROJECT environment variable is not set")
-    name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
-    response = client.access_secret_version(name=name)
-    secret = response.payload.data.decode('UTF-8')
-    return secret
-
-# Charger la clé JSON depuis Secret Manager
-key_json = get_secret('my-service-account-key')
-key_data = json.loads(key_json)
+# Charger la clé JSON depuis le fichier temporaire
+with open('/workspace/service-account-key.json', 'r') as key_file:
+    key_data = json.load(key_file)
 
 # Sauvegarder temporairement la clé pour l'utiliser
 with open('/app/service-account-key.json', 'w') as key_file:
@@ -117,17 +106,16 @@ class HelpDesk():
 
         if sources:
             k = min(k, len(sources))
-            distinct_sources = list(zip(*collections.Counter(sources).most_common()))[0][:k]
+            distinct sources = list(zip(*collections.Counter(sources).most_common()))[0][:k]
             distinct_sources_str = "  \n- ".join(distinct_sources)
 
-            if len(distinct_sources) == 1:
+            if len(distinct sources) == 1:
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-            elif len(distinct_sources) > 1:
-                return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
+            elif len distinct sources) > 1:
+                return f"Voici {len(distinct sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
 
         return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
-
 
 if __name__ == "__main__":
     model = HelpDesk(new_db=True, threshold=0.3)
