@@ -14,7 +14,14 @@ from google.cloud import secretmanager
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
 
-# Charger la clé JSON depuis la variable d'environnement
+def get_secret(secret_id, version_id='latest'):
+    client = secretmanager.SecretManagerServiceClient()
+    name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
+    response = client.access_secret_version(name=name)
+    secret = response.payload.data.decode('UTF-8')
+    return secret
+
+# Charger la clé JSON depuis Secret Manager via la variable d'environnement
 key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
 if key_json is None:
     print("Environment variable SERVICE_ACCOUNT_KEY_JSON is not set.")
@@ -43,13 +50,21 @@ except IOError as e:
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
 print("Environment variable set successfully.")
 
+# Charger la clé API OpenAI depuis les variables d'environnement
+openai_api_key = os.getenv('OPENAI_API_KEY')
+if not openai_api_key:
+    print("Environment variable OPENAI_API_KEY is not set or is empty.")
+    sys.exit(1)
+else:
+    print("OpenAI API Key successfully loaded.")
+
 class HelpDesk():
     """QA chain"""
     def __init__(self, new_db=True, threshold=0.3):
         self.new_db = new_db
         self.template = self.get_template()
         self.embeddings = self.get_embeddings()
-        self.llm = self.get_llm()
+        self.llm = self.get_llm(api_key=openai_api_key)
         self.prompt = self.get_prompt()
         self.threshold = threshold
 
@@ -85,8 +100,8 @@ class HelpDesk():
         embeddings = OpenAIEmbeddings()
         return embeddings
 
-    def get_llm(self):
-        llm = OpenAI()
+    def get_llm(self, api_key):
+        llm = OpenAI(api_key=api_key)
         return llm
 
     def get_retrieval_qa(self):
@@ -133,8 +148,8 @@ class HelpDesk():
             if len(distinct_sources) == 1:
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-            elif len (distinct_sources) > 1:
-                return f"Voici {len (distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
+            elif len(distinct_sources) > 1:
+                return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
 
         return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
 
