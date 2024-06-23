@@ -114,4 +114,4 @@ if __name__ == "__main__":
     prompt = 'Comment est-ce que la formation permet l’obtention de la Certification Professionnelle ?'
     result, sources = model.retrieval_qa_inference(prompt, verbose=False)
     print(result)
-    print("youpiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+    print("youpiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii !!")
