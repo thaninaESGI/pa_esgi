@@ -14,7 +14,7 @@ class DataLoader():
         directories=['bac1_2', 'bac3_5', 'ingestion_bucket_1'],
         persist_directory='./db/chroma/',
         bucket_name='ingestion_bucket_1',
-        credentials_path='pa-ingestion-8d68ccddaee5.json'
+        credentials_path='/app/service-account-key.json'
     ):
         self.directories = directories
         self.persist_directory = persist_directory
@@ -99,29 +99,3 @@ class DataLoader():
             embedding_function=embeddings
         )
         return db
-
-    def set_db(self, embeddings):
-        """Create, save, and load db"""
-        try:
-            shutil.rmtree(self.persist_directory)
-        except Exception as e:
-            logging.warning("%s", e)
-
-        # Load docs
-        docs = self.load_from_pdf_loader()
-
-        # Split docs and add context
-        splitted_docs = self.split_docs(docs)
-
-        db = self.save_to_db(splitted_docs, embeddings)
-
-        return db
-
-    def get_db(self, embeddings):
-        """Create, save, and load db"""
-        db = self.load_from_db(embeddings)
-        return db
-
-
-if __name__ == "__main__":
-    pass
