@@ -19,5 +19,6 @@ EXPOSE 8080
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/service-account-key.json
 
 # Exécutez le script principal
-CMD ["python", "help_desk.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "help_desk:app"]
+
 
