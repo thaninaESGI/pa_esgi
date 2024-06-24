@@ -13,8 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiez les fichiers du projet dans le répertoire de travail
 COPY . .
 
-EXPOSE 8080
-
 # Définir la variable d'environnement pour le fichier des credentials
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/service-account-key.json
 

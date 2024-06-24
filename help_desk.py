@@ -5,6 +5,7 @@ import collections
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
+from langchain_openai import OpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
@@ -34,9 +35,12 @@ except json.JSONDecodeError as e:
     print("Failed to load key data:", e)
     sys.exit(1)
 
+# Définir le chemin du fichier de clé JSON
+credentials_path = '/app/service-account-key.json'
+
 # Sauvegarder temporairement la clé pour l'utiliser
 try:
-    with open('/app/service-account-key.json', 'w') as key_file:
+    with open(credentials_path, 'w') as key_file:
         json.dump(key_data, key_file)
     print("Key file written successfully.")
 except IOError as e:
@@ -44,23 +48,32 @@ except IOError as e:
     sys.exit(1)
 
 # Mettre à jour la variable d'environnement
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/app/service-account-key.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
 print("Environment variable set successfully.")
+
+# Récupérer la clé API OpenAI depuis Secret Manager
+openai_api_key = get_secret('openai-api-key')
+if not openai_api_key:
+    print("Failed to load OpenAI API Key from Secret Manager.")
+    sys.exit(1)
+else:
+    print("OpenAI API Key successfully loaded from Secret Manager.")
 
 class HelpDesk():
     """QA chain"""
     def __init__(self, new_db=True, threshold=0.3):
         self.new_db = new_db
         self.template = self.get_template()
-        self.embeddings = self.get_embeddings()
-        self.llm = self.get_llm()
+        self.embeddings = self.get_embeddings(api_key=openai_api_key)
+        self.llm = self.get_llm(api_key=openai_api_key)
         self.prompt = self.get_prompt()
         self.threshold = threshold
 
+        # Passer le chemin des credentials à DataLoader
         if self.new_db:
-            self.db = load_db.DataLoader().set_db(self.embeddings)
+            self.db = load_db.DataLoader(credentials_path=credentials_path).set_db(self.embeddings)
         else:
-            self.db = load_db.DataLoader().get_db(self.embeddings)
+            self.db = load_db.DataLoader(credentials_path=credentials_path).get_db(self.embeddings)
 
         self.retriever = self.db.as_retriever()
         self.retrieval_qa_chain = self.get_retrieval_qa()
@@ -84,12 +97,12 @@ class HelpDesk():
         )
         return prompt
 
-    def get_embeddings(self) -> OpenAIEmbeddings:
-        embeddings = OpenAIEmbeddings()
+    def get_embeddings(self, api_key) -> OpenAIEmbeddings:
+        embeddings = OpenAIEmbeddings(api_key=api_key)
         return embeddings
 
-    def get_llm(self):
-        llm = OpenAI()
+    def get_llm(self, api_key):
+        llm = OpenAI(api_key=api_key)
         return llm
 
     def get_retrieval_qa(self):
@@ -136,7 +149,7 @@ class HelpDesk():
             if len(distinct sources) == 1:
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-            elif len(distinct sources) > 1:
+            elif len distinct sources) > 1:
                 return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
 
         return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
