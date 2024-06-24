@@ -19,14 +19,13 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/helpdesk-app']
 
-  # Étape 3 : Déployer le job Cloud Run
+  # Étape 3 : Déployer le service Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        gcloud beta run jobs update helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west1 || \
-        gcloud beta run jobs create helpdesk-job --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west1
+        gcloud run deploy helpdesk-service --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west1 --platform managed --allow-unauthenticated
 
 timeout: "1200s"  # Exemple de timeout, ajustez selon vos besoins
 
