@@ -1,3 +1,4 @@
+from flask import Flask, request, jsonify
 import sys
 import load_db
 import collections
@@ -153,12 +154,25 @@ class HelpDesk():
 
         return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
 
+# Créer une instance de Flask
+app = Flask(__name__)
+
+# Charger le modèle HelpDesk
+model = HelpDesk(new_db=True, threshold=0.3)
+
+@app.route('/query', methods=['POST'])
+def query():
+    data = request.get_json()
+    question = data.get("question", "")
+    if not question:
+        return jsonify({"error": "No question provided"}), 400
+
+    result, sources = model.retrieval_qa_inference(question, verbose=False)
+    response = {
+        "result": result,
+        "sources": sources
+    }
+    return jsonify(response)
+
 if __name__ == "__main__":
-    model = HelpDesk(new_db=True, threshold=0.3)
-
-    print(model.db._collection.count())
-
-    prompt = 'Comment est-ce que la formation permet l’obtention de la Certification Professionnelle ?'
-    result, sources = model.retrieval_qa_inference(prompt, verbose=False)
-    print(result)
-    print("youpiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii")
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
