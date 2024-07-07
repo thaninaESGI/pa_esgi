@@ -1,7 +1,5 @@
-import sys
 import logging
 import shutil
-from pathlib import Path
 from google.cloud import storage
 from langchain.vectorstores import Chroma
 from langchain.document_loaders import PyPDFLoader
@@ -11,19 +9,20 @@ class DataLoader():
     """Create, load, save the DB using the PDF Loader"""
     def __init__(
         self,
+        credentials,
         directories=['bac1_2', 'bac3_5', 'ingestion_bucket_1'],
         persist_directory='./db/chroma/',
-        bucket_name='ingestion_bucket_1',
-        credentials_path='/app/service-account-key.json'  # Modifié pour utiliser le chemin correct
+        bucket_name='ingestion_bucket_1'
     ):
         self.directories = directories
         self.persist_directory = persist_directory
         self.bucket_name = bucket_name
-        self.credentials_path = credentials_path
+        self.credentials = credentials
+        self.db = None  # Initialize the db attribute
 
     def download_pdfs_from_bucket(self):
         """Download PDF files from Google Cloud Storage bucket"""
-        client = storage.Client.from_service_account_json(self.credentials_path)
+        client = storage.Client(credentials=self.credentials)
         bucket = client.bucket(self.bucket_name)
         blobs = bucket.list_blobs()
 
@@ -89,6 +88,7 @@ class DataLoader():
         """Save chunks to Chroma DB"""
         db = Chroma.from_documents(splitted_docs, embeddings, persist_directory=self.persist_directory)
         db.persist()
+        self.db = db  # Set the db attribute
         return db
 
     def load_from_db(self, embeddings):
@@ -97,6 +97,7 @@ class DataLoader():
             persist_directory=self.persist_directory,
             embedding_function=embeddings
         )
+        self.db = db  # Set the db attribute
         return db
 
     def set_db(self, embeddings):
@@ -121,6 +122,3 @@ class DataLoader():
         db = self.load_from_db(embeddings)
         return db
 
-
-if __name__ == "__main__":
-    pass
