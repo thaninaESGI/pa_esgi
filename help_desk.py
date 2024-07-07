@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import logging
 import sys
 import load_db
 import collections
@@ -11,53 +12,60 @@ from dotenv import load_dotenv
 import os
 import json
 from google.cloud import secretmanager
+from google.oauth2 import service_account
+
+# Configurer le logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
+
+# Charger la variable d'environnement SERVICE_ACCOUNT_KEY_JSON depuis le fichier .env
+service_account_key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
+
+if not service_account_key_json:
+    logging.error("Service account key not found in environment variables")
+    sys.exit(1)
 
 def get_secret(secret_id, version_id='latest'):
     client = secretmanager.SecretManagerServiceClient()
     name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
     response = client.access_secret_version(name=name)
     secret = response.payload.data.decode('UTF-8')
+    logging.debug(f"Secret fetched: {secret}")
     return secret
 
-# Charger la clé JSON depuis Secret Manager via la variable d'environnement
-key_json = os.getenv('SERVICE_ACCOUNT_KEY_JSON')
-if key_json is None:
-    print("Environment variable SERVICE_ACCOUNT_KEY_JSON is not set.")
-    sys.exit(1)
+# Utiliser la clé JSON chargée directement depuis Secret Manager
+def load_service_account_key():
+    try:
+        secret_data = get_secret('my-service-account-key')
+        key_data = json.loads(secret_data)
+        logging.debug("Key data successfully loaded from Secret Manager.")
+    except json.JSONDecodeError as e:
+        logging.error(f"Failed to load key data: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Error retrieving key data: {e}")
+        sys.exit(1)
 
-try:
-    key_data = json.loads(key_json)
-    print("Key data successfully loaded.")
-except json.JSONDecodeError as e:
-    print("Failed to load key data:", e)
-    sys.exit(1)
+    # Créer les informations d'identification à partir des données JSON
+    credentials = service_account.Credentials.from_service_account_info(key_data)
+    logging.debug("Credentials created successfully from key data.")
+    return credentials
 
-# Définir le chemin du fichier de clé JSON
-credentials_path = '/app/service-account-key.json'
-
-# Sauvegarder temporairement la clé pour l'utiliser
-try:
-    with open(credentials_path, 'w') as key_file:
-        json.dump(key_data, key_file)
-    print("Key file written successfully.")
-except IOError as e:
-    print("Failed to write key file:", e)
-    sys.exit(1)
-
-# Mettre à jour la variable d'environnement
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
-print("Environment variable set successfully.")
+credentials = load_service_account_key()
 
 # Récupérer la clé API OpenAI depuis Secret Manager
-openai_api_key = get_secret('openai-api-key')
-if not openai_api_key:
-    print("Failed to load OpenAI API Key from Secret Manager.")
+try:
+    openai_api_key = get_secret('openai-api-key')
+    if not openai_api_key:
+        logging.error("Failed to load OpenAI API Key from Secret Manager.")
+        sys.exit(1)
+    else:
+        logging.debug("OpenAI API Key successfully loaded from Secret Manager.")
+except Exception as e:
+    logging.error(f"Error retrieving OpenAI API key: {e}")
     sys.exit(1)
-else:
-    print("OpenAI API Key successfully loaded from Secret Manager.")
 
 class HelpDesk():
     """QA chain"""
@@ -68,16 +76,17 @@ class HelpDesk():
         self.llm = self.get_llm(api_key=openai_api_key)
         self.prompt = self.get_prompt()
         self.threshold = threshold
+        self.credentials = credentials
 
-        # Passer le chemin des credentials à DataLoader
+        # Configurer la base de données
         if self.new_db:
-            self.db = load_db.DataLoader(credentials_path=credentials_path).set_db(self.embeddings)
+            self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
         else:
-            self.db = load_db.DataLoader(credentials_path=credentials_path).get_db(self.embeddings)
+            self.db = load_db.DataLoader(credentials=self.credentials).get_db(self.embeddings)
 
         self.retriever = self.db.as_retriever()
         self.retrieval_qa_chain = self.get_retrieval_qa()
-
+        
     def get_template(self):
         template = """
         Etant donnés ces textes:
@@ -118,12 +127,18 @@ class HelpDesk():
 
     def retrieval_qa_inference(self, question, verbose=True):
         query = {"query": question}
-        answer = self.retrieval_qa_chain(query)
+        logging.debug(f"Received question: {question}")
+        try:
+            answer = self.retrieval_qa_chain(query)
+            logging.debug(f"Raw answer: {answer}")
+        except Exception as e:
+            logging.error(f"Error during retrieval QA chain: {e}")
+            raise e
         filtered_answer = self.filter_by_similarity(answer, self.threshold)
         sources = self.list_top_k_sources(filtered_answer, k=3)
 
         if verbose:
-            print(sources)
+            logging.debug(f"Sources: {sources}")
 
         return filtered_answer["result"], sources
 
@@ -141,7 +156,7 @@ class HelpDesk():
             for res in answer["source_documents"]
         ]
 
-        if sources:
+        if sources :
             k = min(k, len(sources))
             distinct_sources = list(zip(*collections.Counter(sources).most_common()))[0][:k]
             distinct_sources_str = "  \n- ".join(distinct_sources)
@@ -149,10 +164,11 @@ class HelpDesk():
             if len(distinct_sources) == 1:
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-            elif len(distinct_sources) > 1:
-                return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
-
-        return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
+            elif len(distinctsources) > 1:
+                return f"Voici {len(distinctsources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
+        else :
+            return 
+        
 
 # Créer une instance de Flask
 app = Flask(__name__)
@@ -160,19 +176,40 @@ app = Flask(__name__)
 # Charger le modèle HelpDesk
 model = HelpDesk(new_db=True, threshold=0.3)
 
-@app.route('/query', methods=['POST'])
+# Route GET pour vérifier que le service fonctionne
+@app.route('/', methods=['GET'])
+def home():
+    return "Service is running", 200
+
+# Route POST pour traiter les requêtes JSON
+@app.route('/', methods=['POST'])
 def query():
     data = request.get_json()
+    logging.debug(f"Received data: {data}")
+    if not data:
+        logging.error("No data received")
+        return jsonify({"error": "No data received"}), 400
+
     question = data.get("question", "")
+    logging.debug(f"Received question: {question}")
     if not question:
+        logging.error("No question provided")
         return jsonify({"error": "No question provided"}), 400
 
-    result, sources = model.retrieval_qa_inference(question, verbose=False)
+    try:
+        result, sources = model.retrieval_qa_inference(question, verbose=False)
+        logging.debug(f"Result: {result}, Sources: {sources}")
+    except Exception as e:
+        logging.error(f"Error during inference: {e}")
+        return jsonify({"error": "Error during inference"}), 500
+
     response = {
         "result": result,
         "sources": sources
     }
+    logging.debug(f"Response: {response}")
     return jsonify(response)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    app.run(host='0.0.0.0', port=8080)
+

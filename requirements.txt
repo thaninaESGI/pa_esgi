@@ -7,3 +7,5 @@ pypdf
 chromadb
 flask
 google-cloud-secret-manager==2.7.0
+gunicorn
+
