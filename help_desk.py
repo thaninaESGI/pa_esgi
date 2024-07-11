@@ -170,7 +170,7 @@ class HelpDesk():
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
             elif len(distinct_sources) > 1:
-                return f"Voici {len(distinctsources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
+                return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
         else:
             return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
 
