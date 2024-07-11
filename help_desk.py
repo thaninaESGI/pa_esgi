@@ -75,16 +75,22 @@ class HelpDesk():
         self.threshold = threshold
         self.credentials = credentials
 
+        # Initialiser la base de données au démarrage
         self.initialize_db()
 
     def initialize_db(self):
-        if self.new_db:
-            self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
-        else:
-            self.db = load_db.DataLoader(credentials=self.credentials).get_db(self.embeddings)
+        try:
+            if self.new_db:
+                self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
+            else:
+                self.db = load_db.DataLoader(credentials=self.credentials).get_db(self.embeddings)
 
-        self.retriever = self.db.as_retriever()
-        self.retrieval_qa_chain = self.get_retrieval_qa()
+            self.retriever = self.db.as_retriever()
+            self.retrieval_qa_chain = self.get_retrieval_qa()
+            logging.debug("Database initialized successfully.")
+        except Exception as e:
+            logging.error(f"Error initializing database: {e}")
+            raise
 
     def get_template(self):
         template = """
@@ -164,14 +170,20 @@ class HelpDesk():
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
             elif len(distinct_sources) > 1:
-                return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
+                return f"Voici {len(distinctsources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
         else:
             return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
 
     def reload_data(self):
         logging.debug("Reloading data from cloud storage...")
-        self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
-        logging.debug("Data reload completed successfully.")
+        try:
+            self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
+            self.retriever = self.db.as_retriever()
+            self.retrieval_qa_chain = self.get_retrieval_qa()
+            logging.debug("Data reload completed successfully.")
+        except Exception as e:
+            logging.error(f"Error reloading data: {e}")
+            raise
 
 app = Flask(__name__)
 model = HelpDesk(new_db=True, threshold=0.3)
