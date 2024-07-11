@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Copiez les fichiers de requirements dans le répertoire de travail
 COPY requirements.txt .
-RUN mkdir -p /tmp/db/chroma && chmod -R 777 /tmp/db/chroma
+RUN mkdir -p /tmp/db && chmod -R 777 /tmp/db
 # Installez les dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
 
