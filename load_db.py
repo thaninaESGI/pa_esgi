@@ -10,7 +10,7 @@ class DataLoader():
     def __init__(
         self,
         credentials,
-        directories=['bac1_2', 'bac3_5', 'ingestion_bucket_1'],
+        directories=['ingestion_bucket_1'],
         persist_directory='/tmp/db/chroma/',  # Utilisez un répertoire accessible en écriture
         bucket_name='ingestion_bucket_1'
     ):
