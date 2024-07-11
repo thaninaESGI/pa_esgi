@@ -1,3 +1,5 @@
+import json
+import os
 from flask import Flask, request, jsonify
 import logging
 import sys
@@ -9,8 +11,6 @@ from langchain.prompts import PromptTemplate
 from langchain_openai import OpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
-import os
-import json
 from google.cloud import secretmanager
 from google.oauth2 import service_account
 
@@ -35,7 +35,6 @@ def get_secret(secret_id, version_id='latest'):
     logging.debug(f"Secret fetched: {secret}")
     return secret
 
-# Utiliser la clé JSON chargée directement depuis Secret Manager
 def load_service_account_key():
     try:
         secret_data = get_secret('my-service-account-key')
@@ -48,14 +47,12 @@ def load_service_account_key():
         logging.error(f"Error retrieving key data: {e}")
         sys.exit(1)
 
-    # Créer les informations d'identification à partir des données JSON
     credentials = service_account.Credentials.from_service_account_info(key_data)
     logging.debug("Credentials created successfully from key data.")
     return credentials
 
 credentials = load_service_account_key()
 
-# Récupérer la clé API OpenAI depuis Secret Manager
 try:
     openai_api_key = get_secret('openai-api-key')
     if not openai_api_key:
@@ -78,7 +75,9 @@ class HelpDesk():
         self.threshold = threshold
         self.credentials = credentials
 
-        # Configurer la base de données
+        self.initialize_db()
+
+    def initialize_db(self):
         if self.new_db:
             self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
         else:
@@ -86,7 +85,7 @@ class HelpDesk():
 
         self.retriever = self.db.as_retriever()
         self.retrieval_qa_chain = self.get_retrieval_qa()
-        
+
     def get_template(self):
         template = """
         Etant donnés ces textes:
@@ -156,7 +155,7 @@ class HelpDesk():
             for res in answer["source_documents"]
         ]
 
-        if sources :
+        if sources:
             k = min(k, len(sources))
             distinct_sources = list(zip(*collections.Counter(sources).most_common()))[0][:k]
             distinct_sources_str = "  \n- ".join(distinct_sources)
@@ -164,24 +163,33 @@ class HelpDesk():
             if len(distinct_sources) == 1:
                 return f"Voici la source qui pourrait t'être utile :  \n- {distinct_sources_str}"
 
-            elif len(distinctsources) > 1:
-                return f"Voici {len(distinctsources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
-        else :
+            elif len(distinct_sources) > 1:
+                return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
+        else:
             return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
-        
 
-# Créer une instance de Flask
+    def reload_data(self):
+        logging.debug("Reloading data from cloud storage...")
+        self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
+        logging.debug("Data reload completed successfully.")
+
 app = Flask(__name__)
-
-# Charger le modèle HelpDesk
 model = HelpDesk(new_db=True, threshold=0.3)
 
-# Route GET pour vérifier que le service fonctionne
 @app.route('/', methods=['GET'])
 def home():
     return "Service is running", 200
 
-# Route POST pour traiter les requêtes JSON
+@app.route('/reload', methods=['POST'])
+def reload():
+    try:
+        model.reload_data()
+        logging.debug("Data reloaded successfully.")
+        return jsonify({"status": "success", "message": "Data reloaded successfully."}), 200
+    except Exception as e:
+        logging.error(f"Error reloading data: {e}")
+        return jsonify({"status": "error", "message": "Error reloading data."}), 500
+
 @app.route('/', methods=['POST'])
 def query():
     data = request.get_json()
@@ -212,4 +220,3 @@ def query():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080)
-
