@@ -87,7 +87,6 @@ class HelpDesk():
 
             self.retriever = self.db.as_retriever()
             self.retrieval_qa_chain = self.get_retrieval_qa()
-            logging.debug("Database initialized successfully.")
         except Exception as e:
             logging.error(f"Error initializing database: {e}")
             raise
@@ -132,19 +131,13 @@ class HelpDesk():
 
     def retrieval_qa_inference(self, question, verbose=True):
         query = {"query": question}
-        logging.debug(f"Received question: {question}")
         try:
             answer = self.retrieval_qa_chain(query)
-            logging.debug(f"Raw answer: {answer}")
         except Exception as e:
             logging.error(f"Error during retrieval QA chain: {e}")
             raise e
         filtered_answer = self.filter_by_similarity(answer, self.threshold)
         sources = self.list_top_k_sources(filtered_answer, k=3)
-
-        if verbose:
-            logging.debug(f"Sources: {sources}")
-
         return filtered_answer["result"], sources
 
     def filter_by_similarity(self, answer, threshold):
@@ -205,20 +198,15 @@ def reload():
 @app.route('/', methods=['POST'])
 def query():
     data = request.get_json()
-    logging.debug(f"Received data: {data}")
     if not data:
-        logging.error("No data received")
         return jsonify({"error": "No data received"}), 400
 
     question = data.get("question", "")
-    logging.debug(f"Received question: {question}")
     if not question:
-        logging.error("No question provided")
         return jsonify({"error": "No question provided"}), 400
 
     try:
         result, sources = model.retrieval_qa_inference(question, verbose=False)
-        logging.debug(f"Result: {result}, Sources: {sources}")
     except Exception as e:
         logging.error(f"Error during inference: {e}")
         return jsonify({"error": "Error during inference"}), 500
@@ -227,7 +215,6 @@ def query():
         "result": result,
         "sources": sources
     }
-    logging.debug(f"Response: {response}")
     return jsonify(response)
 
 if __name__ == "__main__":
