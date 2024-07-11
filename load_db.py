@@ -11,7 +11,7 @@ class DataLoader():
         self,
         credentials,
         directories=['bac1_2', 'bac3_5', 'ingestion_bucket_1'],
-        persist_directory='./db/chroma/',
+        persist_directory='/tmp/db/chroma/',  # Utilisez un répertoire accessible en écriture
         bucket_name='ingestion_bucket_1'
     ):
         self.directories = directories
@@ -121,4 +121,3 @@ class DataLoader():
         """Create, save, and load db"""
         db = self.load_from_db(embeddings)
         return db
-

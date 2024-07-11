@@ -17,14 +17,6 @@ from google.oauth2 import service_account
 # Configurer le logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Assurez-vous que le répertoire de la base de données existe et a les permissions correctes
-db_directory = './db/chroma/'
-if not os.path.exists(db_directory):
-    os.makedirs(db_directory)
-
-# Modifier les permissions pour permettre l'écriture
-os.chmod(db_directory, 0o777)
-
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
 
@@ -89,9 +81,9 @@ class HelpDesk():
     def initialize_db(self):
         try:
             if self.new_db:
-                self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
+                self.db = load_db.DataLoader(credentials=self.credentials, persist_directory='/tmp/db/chroma/').set_db(self.embeddings)
             else:
-                self.db = load_db.DataLoader(credentials=self.credentials).get_db(self.embeddings)
+                self.db = load_db.DataLoader(credentials=self.credentials, persist_directory='/tmp/db/chroma/').get_db(self.embeddings)
 
             self.retriever = self.db.as_retriever()
             self.retrieval_qa_chain = self.get_retrieval_qa()
@@ -185,7 +177,7 @@ class HelpDesk():
     def reload_data(self):
         logging.debug("Reloading data from cloud storage...")
         try:
-            self.db = load_db.DataLoader(credentials=self.credentials).set_db(self.embeddings)
+            self.db = load_db.DataLoader(credentials=self.credentials, persist_directory='/tmp/db/chroma/').set_db(self.embeddings)
             self.retriever = self.db.as_retriever()
             self.retrieval_qa_chain = self.get_retrieval_qa()
             logging.debug("Data reload completed successfully.")
