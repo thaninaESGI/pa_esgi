@@ -4,13 +4,14 @@ from google.cloud import storage
 from langchain.vectorstores import Chroma
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
+import os
 
 class DataLoader():
     """Create, load, save the DB using the PDF Loader"""
     def __init__(
         self,
         credentials,
-        directories=['bac1_2', 'bac3_5', 'ingestion_bucket_1'],
+        directories=['ingestion_bucket_1'],
         persist_directory='/tmp/db/chroma/',  # Utilisez un répertoire accessible en écriture
         bucket_name='ingestion_bucket_1'
     ):
@@ -30,6 +31,7 @@ class DataLoader():
         for blob in blobs:
             if blob.name.endswith('.pdf'):
                 local_path = f'/tmp/{blob.name}'
+                logging.debug(f"Downloading {blob.name} to {local_path}")
                 blob.download_to_filename(local_path)
                 local_paths.append(local_path)
         return local_paths
@@ -39,6 +41,7 @@ class DataLoader():
         docs = []
         pdf_files = self.download_pdfs_from_bucket()
         for pdf_file in pdf_files:
+            logging.debug(f"Loading PDF file: {pdf_file}")
             loader = PyPDFLoader(pdf_file)
             loaded_docs = loader.load()
             for doc in loaded_docs:
@@ -86,13 +89,16 @@ class DataLoader():
 
     def save_to_db(self, splitted_docs, embeddings):
         """Save chunks to Chroma DB"""
+        logging.debug("Saving documents to Chroma DB")
         db = Chroma.from_documents(splitted_docs, embeddings, persist_directory=self.persist_directory)
         db.persist()
+        logging.debug(f"Chroma DB persisted at {self.persist_directory}")
         self.db = db  # Set the db attribute
         return db
 
     def load_from_db(self, embeddings):
         """Load chunks from Chroma DB"""
+        logging.debug(f"Loading Chroma DB from {self.persist_directory}")
         db = Chroma(
             persist_directory=self.persist_directory,
             embedding_function=embeddings
@@ -102,10 +108,12 @@ class DataLoader():
 
     def set_db(self, embeddings):
         """Create, save, and load db"""
+        logging.debug(f"Setting up database at {self.persist_directory}")
         try:
             shutil.rmtree(self.persist_directory)
+            logging.debug(f"Removed existing directory {self.persist_directory}")
         except Exception as e:
-            logging.warning("%s", e)
+            logging.warning(f"Error removing directory {self.persist_directory}: {e}")
 
         # Load docs
         docs = self.load_from_pdf_loader()
@@ -113,7 +121,17 @@ class DataLoader():
         # Split docs and add context
         splitted_docs = self.split_docs(docs)
 
+        # Check permissions before saving
+        for doc in splitted_docs:
+            logging.debug(f"Document metadata: {doc.metadata}")
+
         db = self.save_to_db(splitted_docs, embeddings)
+
+        # Verify file permissions after saving
+        for root, dirs, files in os.walk(self.persist_directory):
+            for f in files:
+                path = os.path.join(root, f)
+                logging.debug(f"File {path} permissions: {oct(os.stat(path).st_mode)[-3:]}")
 
         return db
 
