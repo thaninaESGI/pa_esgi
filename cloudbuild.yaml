@@ -25,7 +25,7 @@ steps:
     args:
       - '-c'
       - |
-        gcloud run deploy help-desk-service --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west9 --platform managed --allow-unauthenticated
+        gcloud run deploy help-desk-service-beta --image gcr.io/$PROJECT_ID/helpdesk-app --region europe-west9 --platform managed --allow-unauthenticated
 
 timeout: "1200s"  # Exemple de timeout, ajustez selon vos besoins
 
