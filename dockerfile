@@ -18,7 +18,7 @@ EXPOSE 8080
 # Définir la variable d'environnement pour le fichier des credentials
 
 
-# Exécutez le script principal
+# Exécutez le  script principal
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "help_desk:app"]
 
 
