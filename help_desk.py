@@ -167,7 +167,7 @@ class HelpDesk():
             elif len(distinctsources) > 1:
                 return f"Voici {len(distinctsources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
         else :
-            return 
+            return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
         
 
 # Créer une instance de Flask
