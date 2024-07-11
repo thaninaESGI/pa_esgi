@@ -40,14 +40,14 @@ def get_secret(secret_id, version_id='latest'):
     name = f"projects/{os.getenv('GCP_PROJECT')}/secrets/{secret_id}/versions/{version_id}"
     response = client.access_secret_version(name=name)
     secret = response.payload.data.decode('UTF-8')
-    #logging.debug(f"Secret fetched: {secret}")
+    logging.debug(f"Secret fetched: {secret}")
     return secret
 
 def load_service_account_key():
     try:
         secret_data = get_secret('my-service-account-key')
         key_data = json.loads(secret_data)
-        #logging.debug("Key data successfully loaded from Secret Manager.")
+        logging.debug("Key data successfully loaded from Secret Manager.")
     except json.JSONDecodeError as e:
         logging.error(f"Failed to load key data: {e}")
         sys.exit(1)
@@ -56,7 +56,7 @@ def load_service_account_key():
         sys.exit(1)
 
     credentials = service_account.Credentials.from_service_account_info(key_data)
-    #logging.debug("Credentials created successfully from key data.")
+    logging.debug("Credentials created successfully from key data.")
     return credentials
 
 credentials = load_service_account_key()
@@ -67,7 +67,7 @@ try:
         logging.error("Failed to load OpenAI API Key from Secret Manager.")
         sys.exit(1)
     else:
-        #logging.debug("OpenAI API Key successfully loaded from Secret Manager.")
+        logging.debug("OpenAI API Key successfully loaded from Secret Manager.")
 except Exception as e:
     logging.error(f"Error retrieving OpenAI API key: {e}")
     sys.exit(1)
@@ -140,10 +140,10 @@ class HelpDesk():
 
     def retrieval_qa_inference(self, question, verbose=True):
         query = {"query": question}
-        #logging.debug(f"Received question: {question}")
+        logging.debug(f"Received question: {question}")
         try:
             answer = self.retrieval_qa_chain(query)
-            #logging.debug(f"Raw answer: {answer}")
+            logging.debug(f"Raw answer: {answer}")
         except Exception as e:
             logging.error(f"Error during retrieval QA chain: {e}")
             raise e
@@ -213,20 +213,20 @@ def reload():
 @app.route('/', methods=['POST'])
 def query():
     data = request.get_json()
-    #logging.debug(f"Received data: {data}")
+    logging.debug(f"Received data: {data}")
     if not data:
         logging.error("No data received")
         return jsonify({"error": "No data received"}), 400
 
     question = data.get("question", "")
-    #logging.debug(f"Received question: {question}")
+    logging.debug(f"Received question: {question}")
     if not question:
         logging.error("No question provided")
         return jsonify({"error": "No question provided"}), 400
 
     try:
         result, sources = model.retrieval_qa_inference(question, verbose=False)
-        #logging.debug(f"Result: {result}, Sources: {sources}")
+        logging.debug(f"Result: {result}, Sources: {sources}")
     except Exception as e:
         logging.error(f"Error during inference: {e}")
         return jsonify({"error": "Error during inference"}), 500
@@ -235,7 +235,7 @@ def query():
         "result": result,
         "sources": sources
     }
-    #logging.debug(f"Response: {response}")
+    logging.debug(f"Response: {response}")
     return jsonify(response)
 
 if __name__ == "__main__":
