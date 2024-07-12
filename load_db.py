@@ -85,10 +85,16 @@ class DataLoader():
         return enriched_docs
 
     def save_to_db(self, splitted_docs, embeddings):
-        """Save chunks to Chroma DB"""
-        db = Chroma.from_documents(splitted_docs, embeddings, persist_directory=self.persist_directory)
-        db.persist()
-        self.db = db  # Set the db attribute
+        batch_size = 50 # Choisissez une taille de lot appropriée
+        db = None
+        for i in range(0, len(splitted_docs), batch_size):
+            batch = splitted_docs[i:i + batch_size]
+            if db is None:
+                db = Chroma.from_documents(batch, embeddings, persist_directory=self.persist_directory)
+            else:
+                db.add_documents(batch)
+        if db:
+            db.persist()
         return db
 
     def load_from_db(self, embeddings):
