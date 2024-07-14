@@ -1,6 +1,6 @@
 import json
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import logging
 import sys
 import load_db
@@ -13,6 +13,7 @@ from langchain_community.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 from google.cloud import secretmanager
 from google.oauth2 import service_account
+from google.cloud import storage  # Import nécessaire pour Google Cloud Storage
 
 # Configurer le logging
 logging.basicConfig(level=logging.DEBUG)
@@ -64,6 +65,33 @@ except Exception as e:
     logging.error(f"Error retrieving OpenAI API key: {e}")
     sys.exit(1)
 
+# Fonction pour télécharger un fichier depuis GCS
+def download_file_from_metadata(res, bucket_name, local_download_path, credentials):
+    from google.cloud import storage
+    import os
+
+    # Récupérer le nom du fichier à partir des métadonnées
+    source = res.metadata.get("source", "Sans source")
+    if source == "Sans source":
+        return None
+    
+    # Extraire le nom de fichier uniquement
+    file_name = os.path.basename(source)
+    local_file_name = os.path.join(local_download_path, file_name.replace(" ", "_"))
+
+    # Télécharger le fichier depuis Google Cloud Storage
+    client = storage.Client(credentials=credentials)
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(file_name)  # Utiliser uniquement le nom du fichier
+    try:
+        blob.download_to_filename(local_file_name)
+        logging.debug(f"Downloaded {file_name} to {local_file_name}")
+    except Exception as e:
+        logging.error(f"Erreur lors du téléchargement du fichier {file_name} depuis GCS : {e}")
+        return None
+    
+    return local_file_name
+
 class HelpDesk():
     """QA chain"""
     def __init__(self, new_db=True, threshold=0.3):
@@ -75,6 +103,8 @@ class HelpDesk():
         self.threshold = threshold
         self.credentials = credentials
         self.db_version = 0  # Version de la base de données
+        self.bucket_name = 'ingestion_bucket_1'
+        self.backend_base_url = 'https://help-desk-service-beta-lxazwit43a-od.a.run.app'  # Remplacez par l'URL de votre backend
 
         # Initialiser la base de données au démarrage
         self.initialize_db()
@@ -136,28 +166,28 @@ class HelpDesk():
 
     def retrieval_qa_inference(self, question, verbose=True):
         query = {"query": question}
-        try:
-            answer = self.retrieval_qa_chain(query)
-        except Exception as e:
-            logging.error(f"Error during retrieval QA chain: {e}")
-            raise e
-        filtered_answer = self.filter_by_similarity(answer, self.threshold)
-        sources = self.list_top_k_sources(filtered_answer, k=3)
-        return filtered_answer["result"], sources
+        answer = self.retrieval_qa_chain(query)
+        sources = self.list_top_k_sources(answer, k=2)
 
-    def filter_by_similarity(self, answer, threshold):
-        filtered_docs = []
-        for doc in answer["source_documents"]:
-            if doc.metadata.get("score", 0) > threshold:
-                filtered_docs.append(doc)
-        answer["source_documents"] = filtered_docs
-        return answer
+        if verbose:
+            print(sources)
 
-    def list_top_k_sources(self, answer, k=3):
-        sources = [
-            f'[{res.metadata.get("title", "Sans titre")}]({res.metadata.get("source", "Sans source")})'
-            for res in answer["source_documents"]
-        ]
+        return answer["result"], sources
+
+    def list_top_k_sources(self, answer, k=2):
+        sources = []
+        local_download_path = '/tmp/pdf_downloads'
+        os.makedirs(local_download_path, exist_ok=True)
+        
+        for res in answer["source_documents"]:
+            source = res.metadata.get("source", "Sans source")
+            if source != "Sans source":
+                title = res.metadata.get("title", os.path.basename(source))
+                local_file_name = download_file_from_metadata(res, self.bucket_name, local_download_path, self.credentials)
+                if local_file_name:
+                    # Construire le lien vers le fichier avec l'URL absolue
+                    file_link = f"{self.backend_base_url}/files/{os.path.basename(local_file_name)}"
+                    sources.append(f'[{title}]({file_link})')
 
         if sources:
             k = min(k, len(sources))
@@ -169,24 +199,8 @@ class HelpDesk():
 
             elif len(distinct_sources) > 1:
                 return f"Voici {len(distinct_sources)} sources qui pourraient t'être utiles :  \n- {distinct_sources_str}"
-        else:
-            return "Je n'ai trouvé pas trouvé de ressource pour répondre à ta question"
 
-    def reload_data(self):
-        logging.debug("Reloading data from cloud storage...")
-        try:
-            self.db_version += 1
-            self.db_path = f'/tmp/db/chroma_v{self.db_version}/'
-            os.makedirs(self.db_path, exist_ok=True)
-            os.chmod(self.db_path, 0o777)
-
-            self.db = load_db.DataLoader(credentials=self.credentials, persist_directory=self.db_path).set_db(self.embeddings)
-            self.retriever = self.db.as_retriever()
-            self.retrieval_qa_chain = self.get_retrieval_qa()
-            logging.debug("Data reload completed successfully.")
-        except Exception as e:
-            logging.error(f"Error reloading data: {e}")
-            raise
+        return "Je n'ai pas trouvé de ressource pour répondre à ta question"
 
 app = Flask(__name__)
 model = HelpDesk(new_db=True, threshold=0.3)
@@ -226,6 +240,11 @@ def query():
         "sources": sources
     }
     return jsonify(response)
+
+# Route pour servir les fichiers téléchargés
+@app.route('/files/<path:filename>', methods=['GET'])
+def serve_file(filename):
+    return send_from_directory('/tmp/pdf_downloads', filename)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080)
